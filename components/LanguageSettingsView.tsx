@@ -1,0 +1,1 @@
+/* This file is removed as per user request. Language settings are now handled by flag icons in the GlobalHeader. */

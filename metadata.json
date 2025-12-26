@@ -1,0 +1,8 @@
+{
+  "name": "Bajada Segura",
+  "description": "Tu espacio seguro de apoyo emocional y prevención en el contexto de chemsex. Sin juicios, anónimo y 24/7.",
+  "requestFramePermissions": [
+    "microphone",
+    "geolocation"
+  ]
+}

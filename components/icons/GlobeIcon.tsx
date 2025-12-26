@@ -1,0 +1,1 @@
+/* This file is removed as per user request to replace GlobeIcon with flag icons directly in GlobalHeader */
