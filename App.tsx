@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { LocalizationProvider } from './context/LocalizationContext';
 import MainMenu from './components/MainMenu';
 import ChatView from './components/ChatView';
@@ -14,115 +14,109 @@ import NewsView from './components/NewsView';
 import LegalNoticeView from './components/LegalNoticeView';
 import SideMenu from './components/SideMenu';
 import WelcomeModal from './components/WelcomeModal';
-import type { View, MapsResult } from './types';
 import { getNearbyUrgentResourcesWithMaps } from './services/geminiService';
+import type { View, MapsResult } from './types';
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>('menu');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(() => !localStorage.getItem('welcomeDismissed'));
   
+  // Estados para Ayuda Urgente
+  const [urgentHelpLoading, setUrgentHelpLoading] = useState(false);
   const [mapsResult, setMapsResult] = useState<MapsResult | null>(null);
-  const [isUrgentHelpLoading, setIsUrgentHelpLoading] = useState(false);
-  const [urgentHelpError, setUrgentHelpError] = useState<string | null>(null);
+  const [urgentError, setUrgentError] = useState<string | null>(null);
 
-  const handleFetchUrgentResources = useCallback(async (silent = false) => {
-    if (!silent) setIsUrgentHelpLoading(true);
-    setUrgentHelpError(null);
+  const handleNavigate = useCallback((view: View) => {
+    if (view === 'urgent') {
+      handleUrgentHelp();
+    } else {
+      setCurrentView(view);
+    }
+    setIsMenuOpen(false);
+    window.scrollTo(0, 0);
+  }, []);
+
+  const handleUrgentHelp = async () => {
+    setUrgentHelpLoading(true);
+    setUrgentError(null);
+    setCurrentView('urgent');
 
     if (!navigator.geolocation) {
-      if (!silent) {
-        setUrgentHelpError("La geolocalización no es compatible con tu navegador.");
-        setIsUrgentHelpLoading(false);
-      }
+      setUrgentError("La geolocalización no es compatible con tu navegador.");
+      setUrgentHelpLoading(false);
       return;
     }
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
-        const { latitude, longitude } = position.coords;
         try {
-          const data = await getNearbyUrgentResourcesWithMaps(latitude, longitude);
-          setMapsResult({
-            text: data.text,
-            links: data.mapsLinks
-          });
+          const { latitude, longitude } = position.coords;
+          const result = await getNearbyUrgentResourcesWithMaps(latitude, longitude);
+          setMapsResult(result);
         } catch (err) {
-          console.error("Error fetching resources:", err);
-          if (!silent) setUrgentHelpError("No pudimos conectar con los servicios de mapas. Llama directamente al 112.");
+          console.error("Error fetching maps data:", err);
+          setUrgentError("No se pudieron cargar los recursos de emergencia.");
         } finally {
-          setIsUrgentHelpLoading(false);
+          setUrgentHelpLoading(false);
         }
       },
       (error) => {
-        if (!silent) {
-          setUrgentHelpError("Permiso de ubicación denegado. No podemos buscar recursos locales sin tu posición.");
-          setIsUrgentHelpLoading(false);
-        }
+        console.error("Geolocation error:", error);
+        setUrgentError("Necesitamos tu ubicación para encontrar los recursos más cercanos.");
+        setUrgentHelpLoading(false);
       },
-      { enableHighAccuracy: true, timeout: 15000 }
+      { timeout: 10000 }
     );
-  }, []);
+  };
 
-  useEffect(() => {
-    const hasVisited = localStorage.getItem('hasVisited');
-    if (!hasVisited) {
-      setShowWelcomeModal(true);
-      localStorage.setItem('hasVisited', 'true');
-    }
-    
-    // Precarga silenciosa de recursos SOS al entrar
-    handleFetchUrgentResources(true);
-  }, [handleFetchUrgentResources]);
-
-  const handleNavigate = (view: View) => {
-    setCurrentView(view);
-    setIsMenuOpen(false);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    
-    // Si navega a urgente y no hay resultados o hay error, reintenta cargar (esta vez con UI de carga)
-    if (view === 'urgent' && (!mapsResult || urgentHelpError)) {
-      handleFetchUrgentResources();
-    }
+  const handleDismissWelcome = () => {
+    setShowWelcome(false);
+    localStorage.setItem('welcomeDismissed', 'true');
   };
 
   const renderView = () => {
     switch (currentView) {
       case 'menu':
-        return <MainMenu onNavigate={handleNavigate} onOpenMenu={() => setIsMenuOpen(true)} isUrgentHelpLoading={isUrgentHelpLoading} />;
+        return <MainMenu onNavigate={handleNavigate} onOpenMenu={() => setIsMenuOpen(true)} isUrgentHelpLoading={urgentHelpLoading} />;
+      case 'chat':
+        return <ChatView onBack={() => setCurrentView('menu')} onOpenMenu={() => setIsMenuOpen(true)} />;
+      case 'evaluation':
+        return <EvaluationView onBack={() => setCurrentView('menu')} onOpenMenu={() => setIsMenuOpen(true)} />;
+      case 'substances':
+        return <SubstancesView onBack={() => setCurrentView('menu')} onOpenMenu={() => setIsMenuOpen(true)} />;
+      case 'tar':
+        return <TarView onBack={() => setCurrentView('menu')} onOpenMenu={() => setIsMenuOpen(true)} />;
       case 'urgent':
-        return (
-          <UrgentHelpView 
-            onBack={() => handleNavigate('menu')} 
-            onOpenMenu={() => setIsMenuOpen(true)}
-            mapsResult={mapsResult}
-            isLoading={isUrgentHelpLoading}
-            error={urgentHelpError}
-          />
-        );
+        return <UrgentHelpView onBack={() => setCurrentView('menu')} onOpenMenu={() => setIsMenuOpen(true)} mapsResult={mapsResult} isLoading={urgentHelpLoading} error={urgentError} />;
+      case 'about':
+        return <AboutView onBack={() => setCurrentView('menu')} onOpenMenu={() => setIsMenuOpen(true)} />;
+      case 'chemsex':
+        return <ChemsexView onBack={() => setCurrentView('menu')} onOpenMenu={() => setIsMenuOpen(true)} />;
+      case 'join':
+        return <JoinUsView onBack={() => setCurrentView('menu')} onOpenMenu={() => setIsMenuOpen(true)} />;
+      case 'news':
+        return <NewsView onBack={() => setCurrentView('menu')} onOpenMenu={() => setIsMenuOpen(true)} />;
+      case 'legal':
+        return <LegalNoticeView onBack={() => setCurrentView('menu')} onOpenMenu={() => setIsMenuOpen(true)} />;
       default:
-        // Render rest of views...
-        if (currentView === 'chat') return <ChatView onBack={() => handleNavigate('menu')} onOpenMenu={() => setIsMenuOpen(true)} />;
-        if (currentView === 'evaluation') return <EvaluationView onBack={() => handleNavigate('menu')} onOpenMenu={() => setIsMenuOpen(true)} />;
-        if (currentView === 'substances') return <SubstancesView onBack={() => handleNavigate('menu')} onOpenMenu={() => setIsMenuOpen(true)} />;
-        if (currentView === 'tar') return <TarView onBack={() => handleNavigate('menu')} onOpenMenu={() => setIsMenuOpen(true)} />;
-        if (currentView === 'about') return <AboutView onBack={() => handleNavigate('menu')} onOpenMenu={() => setIsMenuOpen(true)} />;
-        if (currentView === 'chemsex') return <ChemsexView onBack={() => handleNavigate('menu')} onOpenMenu={() => setIsMenuOpen(true)} />;
-        if (currentView === 'join') return <JoinUsView onBack={() => handleNavigate('menu')} onOpenMenu={() => setIsMenuOpen(true)} />;
-        if (currentView === 'news') return <NewsView onBack={() => handleNavigate('menu')} onOpenMenu={() => setIsMenuOpen(true)} />;
-        if (currentView === 'legal') return <LegalNoticeView onBack={() => handleNavigate('menu')} onOpenMenu={() => setIsMenuOpen(true)} />;
-        return <MainMenu onNavigate={handleNavigate} onOpenMenu={() => setIsMenuOpen(true)} isUrgentHelpLoading={isUrgentHelpLoading} />;
+        return <MainMenu onNavigate={handleNavigate} onOpenMenu={() => setIsMenuOpen(true)} isUrgentHelpLoading={urgentHelpLoading} />;
     }
   };
 
   return (
     <LocalizationProvider>
       <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 font-sans selection:bg-fuchsia-500/30 overflow-x-hidden">
-        <div className="flex-1 flex flex-col">
-          {renderView()}
-        </div>
-        <SideMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} onNavigate={handleNavigate} currentView={currentView} />
-        {showWelcomeModal && <WelcomeModal onClose={() => setShowWelcomeModal(false)} />}
+        {renderView()}
+        
+        <SideMenu 
+          isOpen={isMenuOpen} 
+          onClose={() => setIsMenuOpen(false)} 
+          onNavigate={handleNavigate} 
+          currentView={currentView} 
+        />
+        
+        {showWelcome && <WelcomeModal onClose={handleDismissWelcome} />}
       </div>
     </LocalizationProvider>
   );

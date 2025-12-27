@@ -1,9 +1,9 @@
 
-const CACHE_NAME = 'bajada-segura-v1.1';
+const CACHE_NAME = 'bajada-segura-v1.8';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
-  'https://raw.githubusercontent.com/extresado/App_apoyo_chemsex/refs/heads/main/logo_bajada.png',
+  'https://raw.githubusercontent.com/extresado/bajadasegura-v1/refs/heads/main/20251227_011338_0000.png',
   'https://raw.githubusercontent.com/extresado/App_apoyo_chemsex/refs/heads/main/cohete.png'
 ];
 
@@ -27,7 +27,6 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
-  // Para una SPA, si no encuentra el recurso, sirve el index.html
   event.respondWith(
     caches.match(event.request).then((response) => {
       return response || fetch(event.request).catch(() => {
